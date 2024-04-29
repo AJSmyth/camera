@@ -140,7 +140,7 @@ int set_image_fmt(int fd) {
     if (V4L2_BUF_TYPE_VIDEO_CAPTURE == fmt.type) {
         fmt.fmt.pix.width = 640;
         fmt.fmt.pix.height = 480;
-        fmt.fmt.pix.pixelformat = v4l2_fourcc('V','Y','U','Y');
+        fmt.fmt.pix.pixelformat = v4l2_fourcc('G','B','1','0');
         fmt.fmt.pix.field = V4L2_FIELD_NONE; //progressive (non-interlaced)
 
         // attempt to write format
