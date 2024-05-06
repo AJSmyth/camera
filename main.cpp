@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <linux/videodev2.h>
+#include <linux/i2c-dev.h>
 #include <libv4l2.h>
 #include <errno.h>
 #include <cassert>
@@ -20,6 +21,7 @@ const int MIN_BUF_COUNT = 3;
 
 void print_formats(int fd);
 int set_image_fmt(int fd);
+uint8_t read_camera_reg(uint16_t addr);
 
 typedef struct {
     void *start;
@@ -69,8 +71,8 @@ int main() {
     for (unsigned int i = 0; i < req_buf.count; i++) {
         v4l2_buffer buf;
         memset(&buf, 0, sizeof(buf));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.index = i;
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         err = ioctl(fd, VIDIOC_QUERYBUF, &buf);
         check_err(err);
         return_on_err(err);
@@ -86,48 +88,51 @@ int main() {
         buffers[i].start = mm_buf;
         buffers[i].length = buf.length;
     }
-    
-    // queue buffer
-    v4l2_buffer bufd = {0};
-    bufd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    bufd.memory = V4L2_MEMORY_MMAP;
-    bufd.index = 0;
 
-	err = ioctl(fd, VIDIOC_QBUF, &bufd);
-    check_err(err);
-    return_on_err(err);
-
-    // start streaming
     unsigned int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	err = ioctl(fd, VIDIOC_STREAMON, &type);
-    check_err(err);
-    return_on_err(err);
-    
-    // wait for data
-	fd_set fds;
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-	struct timeval tv = {0};
-	tv.tv_sec = 2;
-	err = select(fd+1, &fds, NULL, NULL, &tv);
-    check_err(err);
-    return_on_err(err);
-    
-    // deque buffer
-    v4l2_buffer bufd_1 = {0};
-    bufd_1.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    bufd_1.memory = V4L2_MEMORY_MMAP;
-    bufd_1.index = 0;
-    
-    err = ioctl(fd, VIDIOC_DQBUF, &bufd_1);
-    check_err(err);
-    return_on_err(err);
+    for (int i = 0; i < 50; ++i) { 
+        // queue buffer
+        v4l2_buffer bufd = {0};
+        bufd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufd.memory = V4L2_MEMORY_MMAP;
+        bufd.index = 0;
+
+        err = ioctl(fd, VIDIOC_QBUF, &bufd);
+        check_err(err);
+        return_on_err(err);
+
+        // start streaming
+        err = ioctl(fd, VIDIOC_STREAMON, &type);
+        check_err(err);
+        return_on_err(err);
+        
+        printf("REEEEE: %x\n", read_camera_reg(0x300A));
+        
+        // wait for data
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+        struct timeval tv = {0};
+        tv.tv_sec = 2;
+        err = select(fd+1, &fds, NULL, NULL, &tv);
+        check_err(err);
+        return_on_err(err);
+        
+        // deque buffer
+        v4l2_buffer bufd_1 = {0};
+        bufd_1.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufd_1.memory = V4L2_MEMORY_MMAP;
+        bufd_1.index = 0;
+        
+        err = ioctl(fd, VIDIOC_DQBUF, &bufd_1);
+        check_err(err);
+        return_on_err(err);
+    }
 
     // stop streaming
     err = ioctl(fd, VIDIOC_STREAMOFF, &type);
     check_err(err);
     return_on_err(err);
-
 
     // write to file
     int file = open("output.yuy", O_RDWR | O_CREAT);
@@ -201,4 +206,28 @@ int set_image_fmt(int fd) {
     return 0;
 }
 
+uint8_t read_camera_reg(uint16_t addr) {
+    int fd = open("/dev/i2c-1", O_RDWR);
 
+    int err = ioctl(fd, I2C_SLAVE, 0x36);
+    check_err(err);
+    return_on_err(err);
+    uint8_t buf[2] = {addr >> 8, addr & 0xff};
+    err = write(fd, buf, 2);
+    check_err(err);
+    return_on_err(err);
+
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	struct timeval tv = {0};
+	tv.tv_sec = 2;
+	err = select(fd+1, &fds, NULL, NULL, &tv);
+    check_err(err);
+    return_on_err(err);
+
+    read(fd, buf, 1);
+    check_err(err);
+    return_on_err(err);
+    return buf[0];
+}
