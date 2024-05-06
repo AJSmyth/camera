@@ -65,7 +65,7 @@ int main() {
     // store an array of buffer pointers and sizes to munmap
     buffer *buffers = (buffer*)calloc(req_buf.count, sizeof(buffer));
     assert(buffers != NULL);
-
+    int size = 0;
     for (unsigned int i = 0; i < req_buf.count; i++) {
         v4l2_buffer buf;
         memset(&buf, 0, sizeof(buf));
@@ -74,6 +74,7 @@ int main() {
         err = ioctl(fd, VIDIOC_QUERYBUF, &buf);
         check_err(err);
         return_on_err(err);
+        size = buf.bytesused;
 
         // map buffer
         void* mm_buf = mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
@@ -85,6 +86,52 @@ int main() {
         buffers[i].start = mm_buf;
         buffers[i].length = buf.length;
     }
+    
+    // queue buffer
+    v4l2_buffer bufd = {0};
+    bufd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    bufd.memory = V4L2_MEMORY_MMAP;
+    bufd.index = 0;
+
+	err = ioctl(fd, VIDIOC_QBUF, &bufd);
+    check_err(err);
+    return_on_err(err);
+
+    // start streaming
+    unsigned int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	err = ioctl(fd, VIDIOC_STREAMON, &type);
+    check_err(err);
+    return_on_err(err);
+    
+    // wait for data
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	struct timeval tv = {0};
+	tv.tv_sec = 2;
+	err = select(fd+1, &fds, NULL, NULL, &tv);
+    check_err(err);
+    return_on_err(err);
+    
+    // deque buffer
+    v4l2_buffer bufd_1 = {0};
+    bufd_1.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    bufd_1.memory = V4L2_MEMORY_MMAP;
+    bufd_1.index = 0;
+    
+    err = ioctl(fd, VIDIOC_DQBUF, &bufd_1);
+    check_err(err);
+    return_on_err(err);
+
+    // stop streaming
+    err = ioctl(fd, VIDIOC_STREAMOFF, &type);
+    check_err(err);
+    return_on_err(err);
+
+
+    // write to file
+    int file = open("output.yuy", O_WRONLY);
+    write(file, buffers[0].start, size);
 
     // un-map buffers
     for (unsigned int i = 0; i < req_buf.count; i++) {
