@@ -130,8 +130,8 @@ int main() {
 
 
     // write to file
-    int file = open("output.yuy", O_WRONLY);
-    write(file, buffers[0].start, size);
+    int file = open("output.yuy", O_RDWR | O_CREAT);
+    write(file, buffers[0].start, buffers[0].length);
 
     // un-map buffers
     for (unsigned int i = 0; i < req_buf.count; i++) {
