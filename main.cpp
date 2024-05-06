@@ -13,15 +13,17 @@
 #include <errno.h>
 #include <cassert>
 
+#include "gpio.h"
 #define check_err(err) if (err < 0) printf("LINE %d: Error: %s\n", __LINE__, strerror(errno))
 #define return_on_err(err) if (err < 0) exit(EXIT_FAILURE)
+#define read_camera_reg(addr) read_camera_reg_fd(i2c_fd, addr)
 
 
 const int MIN_BUF_COUNT = 3;
 
 void print_formats(int fd);
 int set_image_fmt(int fd);
-uint8_t read_camera_reg(uint16_t addr);
+uint8_t read_camera_reg_fd(int fd, uint16_t addr);
 
 typedef struct {
     void *start;
@@ -29,7 +31,13 @@ typedef struct {
 } buffer;
 
 int main() {
-    // open fd
+    // open i2c fd
+    int i2c_fd = open("/dev/i2c-1", O_RDWR);
+
+    gpioInitialise();
+    printf("REEE: %x\n", gpioGetMode(17));
+    printf("REEE: %x\n", gpioGetMode(10));
+    // open camera fd
 	int fd = open("/dev/video0", O_RDWR);
 	if (fd < 0) {
 		printf("FERRL: %s\n", strerror(errno));
@@ -106,7 +114,8 @@ int main() {
         check_err(err);
         return_on_err(err);
         
-        printf("REEEEE: %x\n", read_camera_reg(0x300A));
+        printf("Exposure: %x%x, AGC: %x%x\n", read_camera_reg(0x3501), read_camera_reg(0x3502), read_camera_reg(0x350A),
+        read_camera_reg(0x350B));
         
         // wait for data
         fd_set fds;
@@ -206,9 +215,7 @@ int set_image_fmt(int fd) {
     return 0;
 }
 
-uint8_t read_camera_reg(uint16_t addr) {
-    int fd = open("/dev/i2c-1", O_RDWR);
-
+uint8_t read_camera_reg_fd(int fd, uint16_t addr) {
     int err = ioctl(fd, I2C_SLAVE, 0x36);
     check_err(err);
     return_on_err(err);
