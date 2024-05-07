@@ -73,7 +73,7 @@ int main() {
             enable_cam_b();
             i2c_sel_cam_b(i2c_fd);
         }
-        sleep(1);
+        usleep(1000);
         set_image_fmt(fd);
     }
     for (int cam = 0; cam < 2; ++cam) {
@@ -85,7 +85,7 @@ int main() {
             enable_cam_b();
             i2c_sel_cam_b(i2c_fd);
         }
-        sleep(1);
+        usleep(1000);
         // check capabilities for CAP_STREAMING
         v4l2_capability cap;
         memset(&cap, 0, sizeof(cap));
@@ -122,7 +122,7 @@ int main() {
             enable_cam_b();
             i2c_sel_cam_b(i2c_fd);
         }
-        sleep(1);
+        usleep(1000);
 
         // store an array of buffer pointers and sizes to munmap
         assert(buffers != NULL);
@@ -174,15 +174,14 @@ int main() {
         else {
             enable_cam_b();
             i2c_sel_cam_b(i2c_fd);
-            buffer_idx = 3;
+            buffer_idx = 0;
         }
-        usleep(1000);
 
         // queue buffer
         v4l2_buffer bufd_2 = {0};
         bufd_2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         bufd_2.memory = V4L2_MEMORY_MMAP;
-        bufd_2.index = buffer_idx % 3;
+        bufd_2.index = 0;
 
         err = ioctl(fd, VIDIOC_QBUF, &bufd_2);
         check_err(err);
@@ -192,7 +191,7 @@ int main() {
         check_err(err);
         return_on_err(err);
 
-        //printf("Exposure: %x%x, AGC: %x%x\n", read_camera_reg(0x3501), read_camera_reg(0x3502), read_camera_reg(0x350A), read_camera_reg(0x350B));
+        printf("CAM %d\n", i % 2);//: %x%x, AGC: %x%x\n", read_camera_reg(0x3501), read_camera_reg(0x3502), read_camera_reg(0x350A), read_camera_reg(0x350B));
 
         // wait for data
         fd_set fds;
@@ -220,6 +219,7 @@ int main() {
         err = ioctl(fd, VIDIOC_STREAMOFF, &type);
         check_err(err);
         return_on_err(err);
+        sleep(1);
     }
 
     // stop streaming
