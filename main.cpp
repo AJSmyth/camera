@@ -161,24 +161,6 @@ int main() {
 
         printf("Cam%d", cam);
 
-        // start streaming
-        err = ioctl(fd, VIDIOC_STREAMON, &type);
-        check_err(err);
-        return_on_err(err);
-
-        // queue buffer
-        v4l2_buffer bufd = {0};
-        bufd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        bufd.memory = V4L2_MEMORY_MMAP;
-        bufd.index = cam * 3 - 1;
-
-        err = ioctl(fd, VIDIOC_QBUF, &bufd);
-        check_err(err);
-        return_on_err(err);
-
-        err = ioctl(fd, VIDIOC_STREAMOFF, &type);
-        check_err(err);
-        return_on_err(err);
     }
 
     int file = open("output.yuy", O_RDWR | O_CREAT);
@@ -194,9 +176,24 @@ int main() {
             i2c_sel_cam_b(i2c_fd);
             buffer_idx = 3;
         }
+        usleep(1000);
 
-        printf("Exposure: %x%x, AGC: %x%x\n", read_camera_reg(0x3501), read_camera_reg(0x3502), read_camera_reg(0x350A),
-            read_camera_reg(0x350B));
+        // queue buffer
+        v4l2_buffer bufd_2 = {0};
+        bufd_2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufd_2.memory = V4L2_MEMORY_MMAP;
+        bufd_2.index = buffer_idx % 3;
+
+        err = ioctl(fd, VIDIOC_QBUF, &bufd_2);
+        check_err(err);
+        return_on_err(err);
+
+        err = ioctl(fd, VIDIOC_STREAMON, &type);
+        check_err(err);
+        return_on_err(err);
+
+        //printf("Exposure: %x%x, AGC: %x%x\n", read_camera_reg(0x3501), read_camera_reg(0x3502), read_camera_reg(0x350A), read_camera_reg(0x350B));
+
         // wait for data
         fd_set fds;
         FD_ZERO(&fds);
@@ -219,13 +216,8 @@ int main() {
 
 
         write(file, buffers[buffer_idx].start, buffers[buffer_idx].length);
-        // queue buffer
-        v4l2_buffer bufd_2 = {0};
-        bufd_2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        bufd_2.memory = V4L2_MEMORY_MMAP;
-        bufd_2.index = buffer_idx % 3;
 
-        err = ioctl(fd, VIDIOC_QBUF, &bufd_2);
+        err = ioctl(fd, VIDIOC_STREAMOFF, &type);
         check_err(err);
         return_on_err(err);
     }
